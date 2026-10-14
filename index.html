@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#20344f" />
+    <title>인덕 디펜스 R0 · 중앙광장</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main class="app" id="app">
+      <div class="sky" aria-hidden="true"></div>
+      <header class="topbar">
+        <div class="logo">인덕 디펜스<small>R0 · 중앙광장 방어전</small></div>
+        <div class="stats">
+          <div class="pill hp" id="hpPill" aria-label="본부 체력">🛡️ <b id="hp">10</b><span class="dim">/<span id="hpMax">10</span></span></div>
+          <div class="pill coin" aria-label="코인">🪙 <b id="coin">120</b></div>
+          <button class="icon-btn" id="pauseBtn" type="button" aria-label="일시정지">Ⅱ</button>
+        </div>
+      </header>
+      <section class="wavepanel" aria-live="polite">
+        <div class="wavehead">
+          <strong id="waveLabel">WAVE 0/3</strong>
+          <span id="waveInfo">준비 중</span>
+        </div>
+        <div class="bar"><div id="waveBar"></div></div>
+      </section>
+      <section class="stage" id="stage">
+        <div id="game"></div>
+      </section>
+      <div class="note" id="note">인덕이를 소환하고 길 옆에 배치하세요</div>
+      <footer class="bottom">
+        <div class="majors" id="majors"></div>
+        <div class="actions">
+          <button class="action" id="helpBtn" type="button"><span class="ico">📖</span>도움말</button>
+          <button class="action main" id="summonBtn" type="button"><span class="cost">🪙 <b id="cost">20</b></span>소환하기</button>
+          <button class="action go" id="waveBtn" type="button"><span class="ico">▶</span><span id="waveBtnText">웨이브</span></button>
+        </div>
+      </footer>
+      <div class="toast" id="toast" role="status"></div>
+      <div class="overlay" id="overlay" hidden>
+        <div class="modal" id="modal" role="dialog" aria-modal="true"></div>
+      </div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
