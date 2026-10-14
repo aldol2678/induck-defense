@@ -126,8 +126,9 @@ export class BattleScene extends Phaser.Scene {
     this.tile = Math.floor(Math.min((width - pad * 2) / map.width, (height - pad * 2) / map.height));
     this.ox = Math.round((width - this.tile * map.width) / 2);
     // Spare vertical space goes mostly above the board so a lifted unit (drawn above the finger) stays visible.
-    const slackY = height - this.tile * map.height - pad * 2;
-    this.oy = Math.round(pad + slackY * 0.7);
+    const slackY = Math.max(0, height - this.tile * map.height - pad * 2);
+    const headroom = Math.min(slackY, this.tile * 0.9);
+    this.oy = Math.round(pad + headroom + (slackY - headroom) / 2);
     this.drawBoard();
     for (const s of this.units.values()) s.root.destroy();
     this.units.clear();
@@ -467,7 +468,13 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private onPointerDown(p: Phaser.Input.Pointer): void {
-    if (this.gesture || !this.canInteract()) return;
+    if (this.gesture) {
+      // A gesture whose pointer is no longer down lost its release event: cancel instead of locking input.
+      const owner = this.input.manager.pointers.find((pp) => pp.id === this.gesture!.pointerId);
+      if (owner?.isDown && owner !== p) return;
+      this.cancelGesture();
+    }
+    if (!this.canInteract()) return;
     const cell = this.cellAt(p.x, p.y);
     const unit = this.unitAt(cell);
     this.gesture = { pointerId: p.id, startX: p.x, startY: p.y, cell, unitId: unit?.id ?? null, lifted: false };

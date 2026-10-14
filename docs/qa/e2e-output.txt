@@ -1,15 +1,18 @@
 
-Running 10 tests using 1 worker
+Running 11 tests using 1 worker
 
-  ✓   1 e2e/mobile.spec.ts:59:5 › UI-01 viewport 320x568 › single screen, no document scroll, key controls fully visible (26.3s)
-  ✓   2 e2e/mobile.spec.ts:59:5 › UI-01 viewport 360x640 › single screen, no document scroll, key controls fully visible (28.0s)
-  ✓   3 e2e/mobile.spec.ts:59:5 › UI-01 viewport 390x844 › single screen, no document scroll, key controls fully visible (31.1s)
-  ✓   4 e2e/mobile.spec.ts:105:3 › INPUT / REG via real pointer events (360x640) › INPUT-01: drag to empty cell moves; same major+★ merges; different major swaps (33.1s)
+  ✓   1 e2e/mobile.spec.ts:59:5 › UI-01 viewport 320x568 › single screen, no document scroll, key controls fully visible (27.1s)
+  ✓   2 e2e/mobile.spec.ts:59:5 › UI-01 viewport 360x640 › single screen, no document scroll, key controls fully visible (27.8s)
+  ✓   3 e2e/mobile.spec.ts:59:5 › UI-01 viewport 390x844 › single screen, no document scroll, key controls fully visible (30.7s)
+  ✓   4 e2e/mobile.spec.ts:105:3 › INPUT / REG via real pointer events (360x640) › INPUT-01: drag to empty cell moves; same major+★ merges; different major swaps (32.7s)
   ✓   5 e2e/mobile.spec.ts:138:3 › INPUT / REG via real pointer events (360x640) › INPUT-02: drops on road / spawn / base / outside the board and cancelled drags return home (40.1s)
-  ✓   6 e2e/mobile.spec.ts:158:3 › INPUT / REG via real pointer events (360x640) › tap path: tap a unit (range shown) then tap a cell → same DROP_UNIT logic (6.5s)
-  ✓   7 e2e/mobile.spec.ts:176:3 › INPUT / REG via real pointer events (360x640) › touch drag (CDP touch events) moves a unit; touchcancel returns it (18.3s)
-  ✓   8 e2e/mobile.spec.ts:206:3 › INPUT / REG via real pointer events (360x640) › pause overlay freezes the simulation; resume continues (11.6s)
-  ✓   9 e2e/mobile.spec.ts:221:3 › INPUT / REG via real pointer events (360x640) › UI ↔ core sync: browser session replays headlessly to the identical snapshot (31.2s)
-  ✓  10 e2e/mobile.spec.ts:241:1 › WAVE-01 in browser: no defenders → defeat overlay → restart (56.4s)
+  ✓   6 e2e/mobile.spec.ts:158:3 › INPUT / REG via real pointer events (360x640) › tap path: tap a unit (range shown) then tap a cell → same DROP_UNIT logic (5.9s)
+  ✓   7 e2e/mobile.spec.ts:176:3 › INPUT / REG via real pointer events (360x640) › touch drag (CDP touch events) moves a unit; touchcancel returns it (18.2s)
+  ✓   8 e2e/mobile.spec.ts:206:3 › INPUT / REG via real pointer events (360x640) › pause overlay freezes the simulation; resume continues (12.2s)
+  ✓   9 e2e/mobile.spec.ts:221:3 › INPUT / REG via real pointer events (360x640) › UI ↔ core sync: browser session replays headlessly to the identical snapshot (32.6s)
+  ✓  10 e2e/mobile.spec.ts:241:1 › WAVE-01 in browser: no defenders → defeat overlay → restart (56.9s)
+  ✓  11 e2e/mobile.spec.ts:261:1 › full run in browser: QA seed, bot plays through the UI command bridge → victory overlay (1.4m)
 
-  10 passed (4.9m)
+  Slow test file: e2e/mobile.spec.ts (6.1m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  11 passed (6.1m)

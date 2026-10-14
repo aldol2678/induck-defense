@@ -257,3 +257,42 @@ test('WAVE-01 in browser: no defenders → defeat overlay → restart', async ({
   expect(s).toMatchObject({ phase: 'ready', baseHp: 10, coin: 120, wave: 0, tick: 0, seed: SEED });
   expect(s.units).toHaveLength(0);
 });
+
+test('full run in browser: QA seed, bot plays through the UI command bridge → victory overlay', async ({ page }) => {
+  test.setTimeout(240_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await boot(page);
+  const near = [[2, 2], [3, 2], [4, 2], [5, 2], [2, 4], [3, 4], [4, 4], [5, 4], [5, 0], [4, 0], [3, 0], [0, 4], [0, 3], [2, 6], [3, 6], [4, 6], [1, 2], [6, 4]];
+  let phase = 'intermission';
+  for (let i = 0; i < 400 && phase !== 'victory' && phase !== 'defeat'; i++) {
+    phase = await page.evaluate((near) => {
+      const qa = window.__INDUCK_QA__ as QA;
+      while (qa.dispatch({ type: 'SUMMON' }).accepted);
+      for (let merged = true; merged; ) {
+        merged = false;
+        const s = qa.snapshot();
+        for (const a of s.units) {
+          const b = s.units.find((u) => u.id !== a.id && u.major === a.major && u.star === a.star && u.star < 4);
+          if (b && qa.dispatch({ type: 'DROP_UNIT', unitId: a.id, to: b.cell }).accepted) {
+            merged = true;
+            break;
+          }
+        }
+      }
+      [...qa.snapshot().units]
+        .sort((a, b) => b.star - a.star)
+        .forEach((u, i) => near[i] && qa.dispatch({ type: 'DROP_UNIT', unitId: u.id, to: { x: near[i]![0]!, y: near[i]![1]! } }));
+      const s = qa.snapshot();
+      if (s.phase === 'intermission') qa.dispatch({ type: 'START_WAVE' });
+      return s.phase;
+    }, near);
+    if (i === 60) await page.screenshot({ path: `${SHOTS}/390x844-midwave.png` });
+    await page.waitForTimeout(500);
+  }
+  expect(phase).toBe('victory');
+  await expect(page.locator('#modal')).toContainText('방어 성공');
+  await page.screenshot({ path: `${SHOTS}/390x844-victory.png` });
+  const s = await snap(page);
+  expect(s.wave).toBe(3);
+  expect(s.baseHp).toBeGreaterThan(0);
+});
