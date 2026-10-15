@@ -1,0 +1,8 @@
+     × D1: an exact duplicate of another path → PATH_DUPLICATE 8ms
+     × D2: a path that revisits a cell (A→B→A) → PATH_REVISIT 2ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/core/mapValidation.test.ts > MAP-03 · duplicate paths and revisits (나루 QA D1·D2) > D1: an exact duplicate of another path → PATH_DUPLICATE
+AssertionError: expected true to be false // Object.is equality
+ FAIL  tests/core/mapValidation.test.ts > MAP-03 · duplicate paths and revisits (나루 QA D1·D2) > D2: a path that revisits a cell (A→B→A) → PATH_REVISIT
+AssertionError: expected true to be false // Object.is equality
+      Tests  2 failed | 13 passed (15)

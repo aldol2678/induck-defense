@@ -1,0 +1,48 @@
+{
+  "ruleset": "R0",
+  "tickMs": 50,
+  "summonCost": 20,
+  "startingCoin": 120,
+  "baseHp": 10,
+  "killReward": 5,
+  "waveClearBonus": 20,
+  "maxStar": 4,
+  "starDamageStep": 0.55,
+  "majorOrder": ["engineering", "sports", "humanities"],
+  "majors": {
+    "engineering": {
+      "label": "공대생",
+      "role": "장거리 자동 포탑 · 넓은 사거리",
+      "range": 2.5,
+      "damage": 4,
+      "attackMs": 900,
+      "effect": null
+    },
+    "sports": {
+      "label": "체대생",
+      "role": "근접 돌격 · 짧은 사거리, 강한 한 방",
+      "range": 1.4,
+      "damage": 7,
+      "attackMs": 1000,
+      "effect": null
+    },
+    "humanities": {
+      "label": "문과대생",
+      "role": "약점 분석 · 빠른 공격, 맞은 적은 2초간 받는 피해 +25%",
+      "range": 2.0,
+      "damage": 3,
+      "attackMs": 700,
+      "effect": { "type": "expose", "damageTakenMultiplier": 1.25, "durationMs": 2000 }
+    }
+  },
+  "enemyKinds": {
+    "assignment": { "label": "과제", "hp": 16, "speedCellsPerSecond": 1.0, "baseDamage": 1 },
+    "quiz": { "label": "쪽지시험", "hp": 10, "speedCellsPerSecond": 1.6, "baseDamage": 1 },
+    "exam": { "label": "중간고사", "hp": 45, "speedCellsPerSecond": 0.7, "baseDamage": 2 }
+  },
+  "waves": [
+    { "pattern": ["assignment", "assignment", "assignment", "assignment", "assignment", "assignment"], "spawnIntervalMs": 1500, "hpMultiplier": 2.0 },
+    { "pattern": ["assignment", "quiz", "assignment", "quiz", "assignment", "quiz", "assignment", "exam"], "spawnIntervalMs": 1300, "hpMultiplier": 3.8 },
+    { "pattern": ["assignment", "quiz", "assignment", "exam", "quiz", "assignment", "quiz", "exam", "assignment", "quiz", "assignment", "exam"], "spawnIntervalMs": 1100, "hpMultiplier": 5.6 }
+  ]
+}

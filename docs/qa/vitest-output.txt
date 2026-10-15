@@ -1,0 +1,62 @@
+
+ RUN  v4.1.11 /home/user/induck-defense
+
+ ✓ tests/core/determinism.test.ts > RUN-02 · same seed + commands + ticks ⇒ identical result > 20 replays of the QA seed produce byte-identical state, events and command results 98ms
+ ✓ tests/core/determinism.test.ts > RUN-02 · same seed + commands + ticks ⇒ identical result > a different seed changes the outcome 7ms
+ ✓ tests/core/determinism.test.ts > RUN-02 · same seed + commands + ticks ⇒ identical result > a live GameController session (irregular frame times) replays to the same logical state 24ms
+ ✓ tests/core/movement.test.ts > RUN-01 · plaza single S→B, no attacks > enemies stay on the path centreline, visit every path tile in order and hit the base once each 208ms
+ ✓ tests/core/input.test.ts > summon > costs 20, spawns a ★1 unit on an empty "." cell, RNG order = major then cell 3ms
+ ✓ tests/core/input.test.ts > INPUT-01 · drop onto empty / same / different unit > empty "." → move 1ms
+ ✓ tests/core/input.test.ts > INPUT-01 · drop onto empty / same / different unit > same major + same ★ → merge: target id survives at ★+1 with cooldown reset; dragged unit removed 0ms
+ ✓ tests/core/input.test.ts > INPUT-01 · drop onto empty / same / different unit > different major or different ★ → swap 1ms
+ ✓ tests/core/input.test.ts > INPUT-01 · drop onto empty / same / different unit > drop on its own cell is a no-op success 0ms
+ ✓ tests/core/input.test.ts > INPUT-01 · drop onto empty / same / different unit > tap path: SELECT_UNIT then DROP_UNIT uses the same rules and clears the selection 0ms
+ ✓ tests/core/input.test.ts > INPUT-02 · forbidden or out-of-board drops are atomic failures > road = → FORBIDDEN_TERRAIN, state unchanged 1ms
+ ✓ tests/core/input.test.ts > INPUT-02 · forbidden or out-of-board drops are atomic failures > spawn S → FORBIDDEN_TERRAIN, state unchanged 0ms
+ ✓ tests/core/input.test.ts > INPUT-02 · forbidden or out-of-board drops are atomic failures > base B → FORBIDDEN_TERRAIN, state unchanged 1ms
+ ✓ tests/core/input.test.ts > INPUT-02 · forbidden or out-of-board drops are atomic failures > outside {"x":-1,"y":0} → OUT_OF_BOUNDS 0ms
+ ✓ tests/core/input.test.ts > INPUT-02 · forbidden or out-of-board drops are atomic failures > outside {"x":7,"y":3} → OUT_OF_BOUNDS 2ms
+ ✓ tests/core/input.test.ts > INPUT-02 · forbidden or out-of-board drops are atomic failures > outside {"x":2,"y":9} → OUT_OF_BOUNDS 0ms
+ ✓ tests/core/input.test.ts > INPUT-02 · forbidden or out-of-board drops are atomic failures > outside {"x":1.5,"y":2} → OUT_OF_BOUNDS 0ms
+ ✓ tests/core/input.test.ts > INPUT-02 · forbidden or out-of-board drops are atomic failures > water "~" and wall "X" tiles are forbidden drop targets (engine rule is tile-based) 0ms
+ ✓ tests/core/input.test.ts > INPUT-02 · forbidden or out-of-board drops are atomic failures > unknown unit → NO_UNIT 0ms
+ ✓ tests/core/input.test.ts > INPUT-03 · ★4 merge, full board, no funds — reason + resources + RNG unchanged > ★4 + ★4 same major → MAX_STAR and no swap 0ms
+ ✓ tests/core/input.test.ts > INPUT-03 · ★4 merge, full board, no funds — reason + resources + RNG unchanged > no funds → NO_FUNDS 0ms
+ ✓ tests/core/input.test.ts > INPUT-03 · ★4 merge, full board, no funds — reason + resources + RNG unchanged > 28 buildable cells full → BOARD_FULL 2ms
+ ✓ tests/core/input.test.ts > INPUT-03 · ★4 merge, full board, no funds — reason + resources + RNG unchanged > commands are blocked before START_RUN, while paused and after the game ends 1ms
+ ✓ tests/core/combat.test.ts > damage fixture (contract §5.1) > round(base * (1 + 0.55 * (star-1))) is pinned per major/star 2ms
+ ✓ tests/core/combat.test.ts > damage fixture (contract §5.1) > majors differ in range / damage / attack period 0ms
+ ✓ tests/core/combat.test.ts > COMBAT-01 · placement changes the outcome (same seed, same units) > units hugging the road beat the same units parked in a far corner 9ms
+ ✓ tests/core/combat.test.ts > COMBAT-02 · range, dead targets and deterministic tie-breaks > a sports unit at (0,6) is 1.414 tiles from the nearest road centre and never fires (range 1.4) 3ms
+ ✓ tests/core/combat.test.ts > COMBAT-02 · range, dead targets and deterministic tie-breaks > no damage is ever applied to an enemy after it was killed 2ms
+ ✓ tests/core/combat.test.ts > COMBAT-02 · range, dead targets and deterministic tie-breaks > targets the enemy closest to the base; ties → earlier spawnOrder → lower id 0ms
+ ✓ tests/core/combat.test.ts > COMBAT-02 · range, dead targets and deterministic tie-breaks > each unit fires on its own cooldown (engineering 18 ticks, sports 20, humanities 14) 1ms
+ ✓ tests/core/combat.test.ts > COMBAT-02 · range, dead targets and deterministic tie-breaks > humanities expose: later hits deal round(damage * 1.25) while exposed 1ms
+ ✓ tests/core/rng.test.ts > mulberry32 RNG (contract §6) > is a pure function of the 32-bit state 3ms
+ ✓ tests/core/rng.test.ts > mulberry32 RNG (contract §6) > produces the pinned reference sequence for the QA seed 20261015 8ms
+ ✓ tests/core/rng.test.ts > mulberry32 RNG (contract §6) > rejects strings, negatives, NaN, fractions and >32-bit seeds 1ms
+ ✓ tests/core/mapValidation.test.ts > MAP-01 · map catalog integrity > uses the contract input snapshot bytes (SHA-256) 2ms
+ ✓ tests/core/mapValidation.test.ts > MAP-01 · map catalog integrity > plaza: 7x7, path lengths [21], 28 buildable cells, validation ok 3ms
+ ✓ tests/core/mapValidation.test.ts > MAP-01 · map catalog integrity > lake: 8x7, path lengths [14,10], 28 buildable cells, validation ok 1ms
+ ✓ tests/core/mapValidation.test.ts > MAP-01 · map catalog integrity > building5: 8x7, path lengths [10,9], 29 buildable cells, validation ok 0ms
+ ✓ tests/core/mapValidation.test.ts > MAP-01 · map catalog integrity > reports MAP_NOT_FOUND for unknown ids 0ms
+ ✓ tests/core/mapValidation.test.ts > MAP-02 · mutations fail explicitly (no guessing / no detours) > broken path (gap) → PATH_NON_ADJACENT 1ms
+ ✓ tests/core/mapValidation.test.ts > MAP-02 · mutations fail explicitly (no guessing / no detours) > path through a buildable / water / wall tile → PATH_INVALID_TILE 1ms
+ ✓ tests/core/mapValidation.test.ts > MAP-02 · mutations fail explicitly (no guessing / no detours) > out-of-map coordinate → PATH_OOB 0ms
+ ✓ tests/core/mapValidation.test.ts > MAP-02 · mutations fail explicitly (no guessing / no detours) > start not S / end not B 1ms
+ ✓ tests/core/mapValidation.test.ts > MAP-02 · mutations fail explicitly (no guessing / no detours) > uncovered spawn, empty path, bad dimensions, unknown tile, second base 1ms
+ ✓ tests/core/mapValidation.test.ts > MAP-02 · mutations fail explicitly (no guessing / no detours) > an invalid map refuses to start a session with an explicit error 1ms
+stdout | tests/core/wave.test.ts > WAVE-01 · wave end, victory, defeat, restart > placement strategy matters across seeds: road-side bot wins clearly more than random-placement bot
+[balance] seeds 1..60 — road-side bot 59/60 wins, random-placement bot 11/60 wins
+
+ ✓ tests/core/wave.test.ts > WAVE-01 · wave end, victory, defeat, restart > with no defenders: wave 1 leaks 6 (HP 10→4), wave 2 drops HP to 0 → defeat once and frozen 12ms
+ ✓ tests/core/wave.test.ts > WAVE-01 · wave end, victory, defeat, restart > RESTART resets to a fresh session for the given seed 3ms
+ ✓ tests/core/wave.test.ts > WAVE-01 · wave end, victory, defeat, restart > PAUSE freezes ticks, cooldowns, spawns and movement 1ms
+ ✓ tests/core/wave.test.ts > WAVE-01 · wave end, victory, defeat, restart > the QA seed is winnable: a merge-and-place bot clears all 3 waves (GAME_WON) 60ms
+ ✓ tests/core/wave.test.ts > WAVE-01 · wave end, victory, defeat, restart > placement strategy matters across seeds: road-side bot wins clearly more than random-placement bot 812ms
+
+ Test Files  7 passed (7)
+      Tests  50 passed (50)
+   Start at  18:16:16
+   Duration  1.23s (transform 469ms, setup 0ms, import 659ms, tests 1.30s, environment 1ms)
+
