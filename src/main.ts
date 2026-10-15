@@ -4,6 +4,7 @@ import { getMap, R0_MAP_ID } from './core/catalog';
 import { GameController } from './core/controller';
 import { isValidSeed } from './core/rng';
 import { BattleScene, type SceneHooks } from './game/BattleScene';
+import { readGachaOverview } from './ui/growthBridge';
 import { Hud, REJECT_TEXT } from './ui/hud';
 
 /** Seed choice is the only non-gameplay randomness; ?seed=N reproduces a run exactly. */
@@ -14,8 +15,13 @@ const param = new URLSearchParams(location.search).get('seed');
 const parsed = param !== null && /^\d+$/.test(param) ? Number(param) : NaN;
 const seed = isValidSeed(parsed) ? parsed : newSeed();
 
+// R1-B growth test mode (?r1=1): owned Gacha Lab blueprints are snapshotted once at load
+// (local demo data, read-only). Without the flag the game is the unchanged R0 session.
+const growthMode = new URLSearchParams(location.search).get('r1') === '1';
+const growth = growthMode ? { blueprints: readGachaOverview().equipmentIds } : undefined;
+
 const map = getMap(R0_MAP_ID);
-const controller = new GameController(map, seed);
+const controller = new GameController(map, seed, growth);
 let scene: BattleScene | null = null;
 
 const hud = new Hud({
@@ -50,6 +56,7 @@ const hooks: SceneHooks = {
   onFrame: (s) => hud.update(s),
   onReject: (reason) => hud.toast(REJECT_TEXT[reason]),
   onHint: (text) => hud.hint(text),
+  onMergeChoice: (unitId, to) => hud.showMergeChoice(unitId, to),
 };
 game.scene.add('battle', BattleScene, true, hooks);
 game.events.once(Phaser.Core.Events.READY, () => {

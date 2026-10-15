@@ -485,3 +485,13 @@ button:disabled {
 .research-track strong{display:block;font-size:14px}
 .research-track small{display:block;font-size:11px;margin-top:4px}
 .research-link{display:block;text-align:center;padding:12px;border-radius:11px;background:#316859;color:white;font-weight:900;margin:12px 0;text-decoration:none}
+/* R1-B growth test mode: equipment workshop */
+.secondary-link{background:#5d7a96}
+.modal h3.sub{margin:12px 0 4px;font-size:13px;color:#243c5e}
+.gear-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 0;padding:8px 10px;border-radius:11px;background:#ecf4fa;font-size:13px}
+.gear-row.off{opacity:.72}
+.gear-row span{min-width:0}
+.gear-row small,.research-track small small{display:block;font-size:11px;color:#5f7390}
+.gear-row .na{flex:none;max-width:42%;font-size:11px;font-weight:800;color:#a2463e;text-align:right}
+.modal .mini{flex:none;min-height:36px;padding:6px 10px;border-radius:10px;border:2px solid #b9cde0;border-bottom:4px solid #5d7a96;background:linear-gradient(#e8f1f8,#c4d6e6);color:#2c4a68;font-weight:900;font-size:13px}
+.modal .mini:disabled{opacity:.45}

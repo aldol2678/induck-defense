@@ -1,7 +1,16 @@
 // DOM HUD: top stats, wave bar, action buttons and overlays. Reads snapshots, sends commands.
 import type { GameController } from '../core/controller';
 import { R0_RULES } from '../core/engine';
-import type { DomainEvent, Major, RejectReason, RenderSnapshot } from '../core/types';
+import {
+  canEquip,
+  CRAFT_COST,
+  getEquipment,
+  getTrait,
+  TRAIT_TIER_LABEL,
+  UNSUPPORTED_LABEL,
+  type TraitDef,
+} from '../core/growth';
+import type { DomainEvent, Major, Point, RejectReason, RenderSnapshot } from '../core/types';
 import { MAJOR_STYLE } from '../game/art';
 import { academicTitle, chooseBranch, readAcademic, readGachaOverview, recordVictory, xpToNext } from './growthBridge';
 
@@ -16,7 +25,26 @@ export const REJECT_TEXT: Record<RejectReason, string> = {
   PHASE_BLOCKED: '지금은 할 수 없어요',
   MAX_STAR: '★4는 더 이상 합성할 수 없어요',
   INVALID_STATE: '잘못된 요청이에요',
+  GROWTH_DISABLED: 'R1 성장 시험 모드에서만 쓸 수 있어요',
+  NOT_OWNED: '가챠 연구소에서 얻은 설계도가 없어요',
+  UNSUPPORTED_OPTION: '아직 전투에 구현되지 않은 장비 옵션이에요',
+  NO_ITEM: '그 장비를 찾을 수 없어요',
+  NOT_EQUIPPED: '장착한 장비가 없어요',
+  MAJOR_MISMATCH: '이 전공은 장착할 수 없는 장비예요',
+  CHOICE_REQUIRED: '합성할 때 남길 특성을 골라 주세요',
 };
+
+const esc = (t: string) => t.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+const traitText = (t: TraitDef | undefined) => (t ? `${t.label} <small>(${TRAIT_TIER_LABEL[t.tier]} · ${t.desc})</small>` : '없음');
+const fmt = (n: number) => String(Math.round(n * 100) / 100);
+
+/** R1 growth test mode is opt-in via ?r1=1; plain R0 stays the default. */
+function modeUrl(r1: boolean): string {
+  const url = new URL(location.href);
+  if (r1) url.searchParams.set('r1', '1');
+  else url.searchParams.delete('r1');
+  return url.pathname + url.search;
+}
 
 const MAJORS: Major[] = ['engineering', 'sports', 'humanities'];
 
@@ -33,6 +61,7 @@ export class Hud {
   private overlayKind: string | null = null;
   private rewardSession = String(Date.now()) + ':' + String(crypto.getRandomValues(new Uint32Array(1))[0]);
   private rewardOrdinal = 0;
+  private pendingMerge: { unitId: string; to: Point } | null = null;
 
   constructor(private readonly opts: HudOptions) {
     this.renderMajors();
@@ -141,9 +170,10 @@ export class Hud {
     return this.overlayKind !== null;
   }
 
-  private open(kind: string, html: string): void {
+  private open(kind: string, html: string, refresh = false): void {
     this.overlayKind = kind;
-    this.overlayOpenedAt = performance.now();
+    // A refresh re-renders the same dialog in place; keep the original input-transition guard time.
+    if (!refresh) this.overlayOpenedAt = performance.now();
     $('modal').innerHTML = html;
     $('overlay').hidden = false;
     this.opts.onOverlayChange(true);
@@ -163,7 +193,8 @@ export class Hud {
       <p>캠퍼스 중앙광장에 <b>과제·쪽지시험·중간고사</b>가 몰려와요! 출현지에서 S자 길을 따라 <b>본부</b>로 향하는 적을 인덕이들이 막아야 해요.</p>
       <div class="help">🪙 <b>소환</b> — 공대생·체대생·문과대생 중 랜덤<br>👆 <b>드래그</b> — 빈 칸 이동 · 같은 전공·★ 합성 · 다른 인덕이와 교환<br>🎯 인덕이는 각자 사거리 안의 적을 자동 공격 — <b>길 가까이</b> 둘수록 유리<br>🛡️ 적이 본부에 닿으면 HP 감소 · 3 웨이브를 막으면 승리</div>
       <button class="btn" data-act="start">전투 준비 ▶</button>
-      <div class="seed">seed ${s.seed} · ruleset R0 · map plaza</div>`,
+      ${s.growth ? '<p class="desc">🧰 <b>R1-B 성장 시험 모드</b> — 소환된 인덕이마다 고유 특성이 붙고, 🔬 연구 화면의 장비 공방에서 장비를 만들어 장착할 수 있어요. 수치는 시험값이에요.</p>' : ''}
+      <div class="seed">seed ${s.seed} · ruleset R0${s.growth ? ' + R1-B growth (test)' : ''} · map plaza</div>`,
     );
   }
 
@@ -181,7 +212,7 @@ export class Hud {
     );
   }
 
-  private showResearch(): void {
+  private showResearch(refresh = false): void {
     const snapshot = this.c.getSnapshot();
     if (snapshot.phase === 'wave') {
       this.toast('🔬 연구 기록은 웨이브 사이에 확인할 수 있어요');
@@ -197,15 +228,82 @@ export class Hud {
         : '';
       return '<div class="research-track"><strong>' + R0_RULES.majors[m].label + ' · 학사 Lv.' + t.level + '</strong><small>' + academicTitle(t) + ' · ' + xpText + '</small>' + choose + '</div>';
     }).join('');
+    const growthMode = !!snapshot.growth;
     this.open('research',
       '<h2>🔬 전공 성장 · 가챠 연동</h2>' +
-      '<p class="desc">현재 실증 범위: 같은 브라우저의 가챠 보유 데이터 조회와 전공별 학사 XP 기록. 장비 전투 적용·연구 카드 선택은 아직 연결되지 않았어요.</p>' +
+      (growthMode
+        ? this.workshopHtml(snapshot) +
+          '<a class="research-link secondary-link" href="' + modeUrl(false) + '">R0 기본 모드로 새 게임</a>'
+        : '<p class="desc">현재 실증 범위: 같은 브라우저의 가챠 보유 데이터 조회와 전공별 학사 XP 기록. 장비 전투 적용·고유 특성은 R1 성장 시험 모드에서 쓸 수 있어요. 연구 카드는 아직 연결되지 않았어요.</p>' +
+          '<a class="research-link" href="' + modeUrl(true) + '">🧰 R1 성장 시험 모드(장비·특성)로 새 게임</a>') +
       '<div class="help">가챠 저장 데이터: <b>' + (gacha.linked ? '연결됨 (로컬 데모)' : '아직 없음') + '</b><br>' +
       '보유 장비 설계도 <b>' + gacha.equipmentIds.length + '종</b> · 스킨 <b>' + gacha.skinIds.length + '종</b><br>' +
       '인덕코인 <b>' + gacha.ic + ' IC</b> · 연구칩 <b>' + gacha.rc + ' RC</b></div>' +
       '<a class="research-link" href="/gacha.html" target="_blank" rel="noopener noreferrer">🎰 가챠 연구소 v0.4.1 열기 ↗</a>' +
       '<p class="desc">가챠 연구소를 연 뒤 돌아와 연구 버튼을 다시 누르면 보유량이 갱신됩니다. 전투 승리 시 최종 배치된 전공마다 시험 XP 25가 기록됩니다.</p>' +
-      rows + '<button class="btn" data-act="resume">게임으로 돌아가기</button>'
+      rows + '<button class="btn" data-act="resume">게임으로 돌아가기</button>',
+      refresh,
+    );
+  }
+
+  /** R1-B equipment workshop: craft owned blueprints with battle coins, equip the selected unit. */
+  private workshopHtml(s: RenderSnapshot): string {
+    const g = s.growth!;
+    const selected = s.units.find((u) => u.id === s.selectedUnitId);
+    const bp = g.blueprints.length
+      ? g.blueprints
+          .map((id) => {
+            const def = getEquipment(id)!;
+            const who = def.major === 'shared' ? '공용' : R0_RULES.majors[def.major].label;
+            const action = def.mods
+              ? '<button class="mini" data-act="craft" data-bp="' + def.id + '"' + (s.coin < CRAFT_COST[def.rarity] ? ' disabled' : '') + '>제작 🪙' + CRAFT_COST[def.rarity] + '</button>'
+              : '<span class="na">사용불가 · 미구현(' + UNSUPPORTED_LABEL[def.unsupported!] + ')</span>';
+            return '<div class="gear-row' + (def.mods ? '' : ' off') + '"><span>' + def.emoji + ' <b>' + esc(def.name) + '</b><small>' + who + ' · ' + esc(def.desc) + '</small></span>' + action + '</div>';
+          })
+          .join('')
+      : '<p class="desc">보유 설계도가 없어요. 가챠 연구소에서 장비 설계도를 뽑은 뒤 이 모드로 새 게임을 시작하세요.</p>';
+    const unitBox = selected
+      ? (() => {
+          const gear = getEquipment(selected.equipment?.blueprintId);
+          return '<div class="research-track"><strong>선택: ' + R0_RULES.majors[selected.major].label + ' ★' + selected.star + '</strong>' +
+            '<small>특성 ' + traitText(getTrait(selected.trait)) + '</small>' +
+            '<small>장비 ' + (gear ? gear.emoji + ' ' + esc(gear.name) : '없음 (1칸)') + ' · 공격 ' + fmt(selected.damage) + ' · 사거리 ' + fmt(selected.range) + '칸</small>' +
+            (gear ? '<button class="mini" data-act="unequip" data-unit="' + selected.id + '">장비 해제</button>' : '') + '</div>';
+        })()
+      : '<p class="desc">보드에서 인덕이를 탭해 선택한 뒤 이 화면을 열면 장비를 장착할 수 있어요.</p>';
+    const inv = g.inventory.length
+      ? g.inventory
+          .map((item) => {
+            const def = getEquipment(item.blueprintId)!;
+            const ok = !!selected && canEquip(def, selected.major);
+            return '<div class="gear-row"><span>' + def.emoji + ' <b>' + esc(def.name) + '</b><small>' + esc(def.desc) + '</small></span>' +
+              '<button class="mini" data-act="equip" data-item="' + item.id + '"' + (ok ? '' : ' disabled') + '>장착</button></div>';
+          })
+          .join('')
+      : '<p class="desc">제작한 장비가 여기에 보관돼요.</p>';
+    return '<div class="help"><b>🧰 장비 공방 · R1-B 시험 모드</b><br>런 시작 때 고정한 로컬 데모 설계도로 판 안에서 장비를 제작해요. 전투 코인만 쓰며 IC·RC는 바뀌지 않아요. 수치는 시험값이에요.</div>' +
+      '<h3 class="sub">보유 설계도</h3>' + bp +
+      '<h3 class="sub">장착</h3>' + unitBox +
+      '<h3 class="sub">보관함</h3>' + inv;
+  }
+
+  /** Opened by the scene when the core rejected a merge with CHOICE_REQUIRED (nothing changed yet). */
+  showMergeChoice(unitId: string, to: Point): void {
+    const s = this.c.getSnapshot();
+    const source = s.units.find((u) => u.id === unitId);
+    const target = s.units.find((u) => u.cell.x === to.x && u.cell.y === to.y);
+    if (!source || !target || this.overlayOpen) return;
+    if (!s.paused && (s.phase === 'wave' || s.phase === 'intermission')) this.c.dispatch({ type: 'PAUSE' });
+    this.pendingMerge = { unitId, to: { ...to } };
+    const st = getTrait(source.trait);
+    const tt = getTrait(target.trait);
+    this.open(
+      'merge',
+      `<h2>✨ 합성 · 특성 계승</h2>
+      <p class="desc">${R0_RULES.majors[target.major].label} ★${target.star} 두 명의 고유 특성이 달라요. 합성 결과에 남길 특성을 하나 고르세요. 결과 유닛의 장비는 그대로, 재료 유닛의 장비는 보관함으로 돌아가요.</p>
+      <button class="btn secondary" data-act="merge-inherit" data-inherit="target">자리 유닛 특성 유지 · ${traitText(tt)}</button>
+      <button class="btn secondary" data-act="merge-inherit" data-inherit="source">옮긴 유닛 특성 계승 · ${traitText(st)}</button>
+      <button class="btn" data-act="merge-cancel">합성 취소 (아무것도 바뀌지 않아요)</button>`,
     );
   }
 
@@ -270,6 +368,28 @@ export class Hud {
     } else if (act === 'research') {
       this.close();
       this.showResearch();
+    } else if (act === 'craft' || act === 'equip' || act === 'unequip') {
+      const r =
+        act === 'craft'
+          ? this.c.dispatch({ type: 'CRAFT_EQUIPMENT', blueprintId: btn.dataset.bp ?? '' })
+          : act === 'equip'
+            ? this.c.dispatch({ type: 'EQUIP', unitId: this.c.getSnapshot().selectedUnitId ?? '', itemId: btn.dataset.item ?? '' })
+            : this.c.dispatch({ type: 'UNEQUIP', unitId: btn.dataset.unit ?? '' });
+      if (!r.accepted && r.reason) this.toast(REJECT_TEXT[r.reason]);
+      else this.toast(act === 'craft' ? '🧰 장비를 제작했어요' : act === 'equip' ? '🧰 장비를 장착했어요' : '🧰 장비를 보관함에 넣었어요');
+      this.showResearch(true);
+    } else if (act === 'merge-inherit' || act === 'merge-cancel') {
+      const pending = this.pendingMerge;
+      this.pendingMerge = null;
+      this.close();
+      if (this.c.getSnapshot().paused) this.c.dispatch({ type: 'RESUME' });
+      if (act === 'merge-inherit' && pending) {
+        const inherit = btn.dataset.inherit === 'source' ? 'source' : 'target';
+        const r = this.c.dispatch({ type: 'DROP_UNIT', unitId: pending.unitId, to: pending.to, inherit });
+        if (!r.accepted && r.reason) this.toast(REJECT_TEXT[r.reason]);
+      } else {
+        this.toast('합성을 취소했어요');
+      }
     } else if (act === 'choose-branch') {
       const major = btn.dataset.major as Major;
       const branch = btn.dataset.branch as 'research' | 'operations';

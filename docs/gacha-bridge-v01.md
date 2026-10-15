@@ -26,7 +26,7 @@ Stacked Draft PR based on R0 Draft PR #1 branch `ccr-cd9ce6b1-u5hiww`. DO NOT me
 5. Cross-browser/same-origin condition matters: opening `file://` Lab outside the Vite origin WILL NOT share the demo inventory with localhost.
 
 ## Follow-up scope (implementation needed before claiming full integration)
-- R1-B: item-per-unit equipment slot + in-run crafting and unlock validation; one item/slot; reversible merge.
+- R1-B: item-per-unit equipment slot + in-run crafting and unlock validation; one item/slot; reversible merge. → Implemented as an opt-in test mode (`?r1=1`) in the stacked R1-B Draft PR; see `docs/growth-r1b.md`.
 - R1-C: campus XP Lv1–8, deterministic seeded 3-choice research cards with R0 RNG stream unaffected, and real stat modifiers.
 - R1-D: summon innate traits + merge inheritance, 30-stage unlocks & XP tuning, feature gating; user-approved balance.
 - Security: replace localStorage with server-authenticated inventory and idempotent server reward ledger before any production shared IC integration.

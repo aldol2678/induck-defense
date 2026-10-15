@@ -2,7 +2,7 @@
 import { MAP_CATALOG_SHA256 } from './catalog';
 import { applyCommand, createSession, enemyWorldPosition, getSnapshot, stepWithEvents } from './engine';
 import type { ReplayEntry, ReplayLog } from './replay';
-import type { CommandResult, DomainEvent, GameState, MapDefinition, PlayerCommand, RenderSnapshot } from './types';
+import type { CommandResult, DomainEvent, GameState, GrowthConfig, MapDefinition, PlayerCommand, RenderSnapshot } from './types';
 
 export type EventListener = (events: DomainEvent[], snapshot: RenderSnapshot) => void;
 
@@ -19,8 +19,9 @@ export class GameController {
   constructor(
     private readonly map: MapDefinition,
     seed: number,
+    growth?: GrowthConfig,
   ) {
-    this.state = createSession({ map, seed, ruleset: 'R0' });
+    this.state = createSession({ map, seed, ruleset: 'R0', growth });
   }
 
   onEvents(listener: EventListener): () => void {
@@ -98,6 +99,7 @@ export class GameController {
       seed: this.state.seed,
       entries: structuredClone(this.log),
       totalTicks: this.state.tick,
+      ...(this.state.growth ? { growth: { blueprints: [...this.state.growth.blueprints] } } : {}),
     };
   }
 }
