@@ -3,6 +3,7 @@ import type { GameController } from '../core/controller';
 import { R0_RULES } from '../core/engine';
 import type { DomainEvent, Major, RejectReason, RenderSnapshot } from '../core/types';
 import { MAJOR_STYLE } from '../game/art';
+import { academicTitle, chooseBranch, readAcademic, readGachaOverview, recordVictory, xpToNext } from './growthBridge';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -30,6 +31,8 @@ export class Hud {
   private toastTimer = 0;
   private overlayOpenedAt = 0;
   private overlayKind: string | null = null;
+  private rewardSession = String(Date.now()) + ':' + String(crypto.getRandomValues(new Uint32Array(1))[0]);
+  private rewardOrdinal = 0;
 
   constructor(private readonly opts: HudOptions) {
     this.renderMajors();
@@ -37,6 +40,7 @@ export class Hud {
     $('waveBtn').addEventListener('click', () => this.command({ type: 'START_WAVE' }));
     $('pauseBtn').addEventListener('click', () => this.pause());
     $('helpBtn').addEventListener('click', () => this.showHelp());
+    $('researchBtn').addEventListener('click', () => this.showResearch());
     $('majors').addEventListener('click', (e) => {
       const chip = (e.target as HTMLElement).closest<HTMLElement>('[data-major]');
       if (chip) this.showMajor(chip.dataset.major as Major);
@@ -123,6 +127,7 @@ export class Hud {
       } else if (e.type === 'WAVE_CLEARED' && snap.phase === 'intermission') {
         this.toast(`🏆 WAVE ${e.wave} 방어 성공! 보너스 +${R0_RULES.waveClearBonus}🪙`);
       } else if (e.type === 'GAME_WON') {
+        recordVictory(this.rewardSession + ':' + this.rewardOrdinal, snap.units.map(u => u.major));
         this.showEnd(true, snap);
       } else if (e.type === 'GAME_LOST') {
         this.showEnd(false, snap);
@@ -176,6 +181,34 @@ export class Hud {
     );
   }
 
+  private showResearch(): void {
+    const snapshot = this.c.getSnapshot();
+    if (snapshot.phase === 'wave') {
+      this.toast('🔬 연구 기록은 웨이브 사이에 확인할 수 있어요');
+      return;
+    }
+    const academic = readAcademic();
+    const gacha = readGachaOverview();
+    const rows = MAJORS.map(m => {
+      const t = academic.tracks[m];
+      const xpText = t.level === 30 ? '최종 단계' : t.xp + ' / ' + xpToNext(t.level) + ' XP';
+      const choose = t.level >= 27 && !t.branch
+        ? '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn secondary" data-act="choose-branch" data-major="' + m + '" data-branch="research">연구 경로</button><button class="btn secondary" data-act="choose-branch" data-major="' + m + '" data-branch="operations">운영 경로</button></div>'
+        : '';
+      return '<div class="research-track"><strong>' + R0_RULES.majors[m].label + ' · 학사 Lv.' + t.level + '</strong><small>' + academicTitle(t) + ' · ' + xpText + '</small>' + choose + '</div>';
+    }).join('');
+    this.open('research',
+      '<h2>🔬 전공 성장 · 가챠 연동</h2>' +
+      '<p class="desc">현재 실증 범위: 같은 브라우저의 가챠 보유 데이터 조회와 전공별 학사 XP 기록. 장비 전투 적용·연구 카드 선택은 아직 연결되지 않았어요.</p>' +
+      '<div class="help">가챠 저장 데이터: <b>' + (gacha.linked ? '연결됨 (로컬 데모)' : '아직 없음') + '</b><br>' +
+      '보유 장비 설계도 <b>' + gacha.equipmentIds.length + '종</b> · 스킨 <b>' + gacha.skinIds.length + '종</b><br>' +
+      '인덕코인 <b>' + gacha.ic + ' IC</b> · 연구칩 <b>' + gacha.rc + ' RC</b></div>' +
+      '<a class="research-link" href="/gacha.html" target="_blank" rel="noopener noreferrer">🎰 가챠 연구소 v0.4.1 열기 ↗</a>' +
+      '<p class="desc">가챠 연구소를 연 뒤 돌아와 연구 버튼을 다시 누르면 보유량이 갱신됩니다. 전투 승리 시 최종 배치된 전공마다 시험 XP 25가 기록됩니다.</p>' +
+      rows + '<button class="btn" data-act="resume">게임으로 돌아가기</button>'
+    );
+  }
+
   private showHelp(): void {
     const s = this.c.getSnapshot();
     if (!s.paused && (s.phase === 'wave' || s.phase === 'intermission')) this.c.dispatch({ type: 'PAUSE' });
@@ -212,6 +245,7 @@ export class Hud {
       `<h2>${won ? '🏆 중앙광장 방어 성공!' : '💔 본부 함락'}</h2>
       <p>${won ? '인덕이들이 모든 웨이브를 막아냈어요!' : `WAVE ${s.wave}에서 본부가 무너졌어요. 배치를 바꿔 다시 도전해 보세요.`}</p>
       <div class="stat-row"><div>웨이브<b>${s.wave}/${s.totalWaves}</b></div><div>처치<b>${s.kills}</b></div><div>본부 HP<b>${s.baseHp}</b></div></div>
+      <button class="btn secondary" data-act="research">🔬 전공 성장·가챠 현황</button>
       <button class="btn" data-act="restart-new">새 게임 ↻</button>
       <button class="btn secondary" data-act="restart-same">같은 시드로 재도전</button>
       <div class="seed">seed ${s.seed} · tick ${s.tick}</div>`,
@@ -233,10 +267,18 @@ export class Hud {
     } else if (act === 'help') {
       this.close();
       this.showHelp();
+    } else if (act === 'research') {
+      this.close();
+      this.showResearch();
+    } else if (act === 'choose-branch') {
+      const major = btn.dataset.major as Major;
+      const branch = btn.dataset.branch as 'research' | 'operations';
+      if (chooseBranch(major, branch)) this.showResearch();
     } else if (act === 'restart-same' || act === 'restart-new') {
       const seed = act === 'restart-same' ? this.c.getSnapshot().seed : this.opts.newSeed();
       this.close();
       this.c.dispatch({ type: 'RESTART', seed });
+      this.rewardOrdinal++;
       const url = new URL(location.href);
       url.searchParams.set('seed', String(seed));
       history.replaceState(null, '', url);
