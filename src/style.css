@@ -252,7 +252,7 @@ button:disabled {
 }
 .actions {
   display: grid;
-  grid-template-columns: 1fr 1.8fr 1fr;
+  grid-template-columns: 0.85fr 0.85fr 1.65fr 1fr;
   gap: 6px;
   margin-top: 6px;
 }
@@ -478,3 +478,10 @@ button:disabled {
     animation: none;
   }
 }
+
+/* Prototype-only same-origin gacha/academic bridge */
+.action.research-action{font-size:clamp(11px,3.2vw,14px)}
+.research-track{margin:8px 0;padding:10px;border:1px solid #7f9ab1;border-radius:12px;background:#e7f0ed;color:#193b48;word-break:keep-all}
+.research-track strong{display:block;font-size:14px}
+.research-track small{display:block;font-size:11px;margin-top:4px}
+.research-link{display:block;text-align:center;padding:12px;border-radius:11px;background:#316859;color:white;font-weight:900;margin:12px 0;text-decoration:none}
