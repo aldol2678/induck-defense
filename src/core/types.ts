@@ -50,6 +50,35 @@ export type Unit = {
   star: Star;
   cell: Point;
   cooldownTicks: number;
+  // R1-B growth fields — present only in growth sessions (plain R0 units stay byte-identical).
+  /** Innate trait id (src/core/growth.ts TRAITS). */
+  trait?: string;
+  /** The unit's single equipment slot. */
+  equipment?: EquipmentItem | null;
+  /** Fractional damage carry in 1/100 damage units. */
+  damageCarry?: number;
+  /** Fractional cooldown carry in 1/100 ticks. */
+  cooldownCarry?: number;
+};
+
+export type TraitTier = 'normal' | 'rare' | 'epic' | 'legend';
+
+/** Integer stat modifiers: percent for damage / attack speed, 1/100 tile for range. */
+export type StatMods = { damagePct: number; attackSpeedPct: number; rangeCenti: number };
+
+/** An in-run crafted item. `blueprintId` is a Gacha Lab equipment id (eq-…). */
+export type EquipmentItem = { id: string; blueprintId: string };
+
+/** Run-start growth snapshot. Owned blueprints are fixed for the whole run (and restarts). */
+export type GrowthConfig = { blueprints: string[] };
+
+export type GrowthState = {
+  blueprints: string[];
+  /** Separate mulberry32 stream for innate traits; the R0 gameplay stream is untouched. */
+  traitRngState: number;
+  nextItemId: number;
+  /** Crafted items that are not equipped. */
+  inventory: EquipmentItem[];
 };
 
 export type Enemy = {
@@ -132,18 +161,29 @@ export type GameState = {
   /** Map and rules travel with the state so a serialized state is self-contained. */
   map: MapDefinition;
   rules: Ruleset;
+  /** R1-B growth layer. Absent in plain R0 sessions. */
+  growth?: GrowthState;
 };
 
 export type PlayerCommand =
   | { type: 'START_RUN' }
   | { type: 'START_WAVE' }
   | { type: 'SUMMON' }
-  | { type: 'DROP_UNIT'; unitId: string; to: Point }
+  | {
+      type: 'DROP_UNIT';
+      unitId: string;
+      to: Point;
+      /** Growth sessions: which trait the merge result keeps when the two differ. */
+      inherit?: 'target' | 'source';
+    }
   | { type: 'SELECT_UNIT'; unitId: string }
   | { type: 'CANCEL_SELECTION' }
   | { type: 'PAUSE' }
   | { type: 'RESUME' }
-  | { type: 'RESTART'; seed: number };
+  | { type: 'RESTART'; seed: number }
+  | { type: 'CRAFT_EQUIPMENT'; blueprintId: string }
+  | { type: 'EQUIP'; unitId: string; itemId: string }
+  | { type: 'UNEQUIP'; unitId: string };
 
 export type RejectReason =
   | 'OUT_OF_BOUNDS'
@@ -153,7 +193,14 @@ export type RejectReason =
   | 'BOARD_FULL'
   | 'PHASE_BLOCKED'
   | 'MAX_STAR'
-  | 'INVALID_STATE';
+  | 'INVALID_STATE'
+  | 'GROWTH_DISABLED'
+  | 'NOT_OWNED'
+  | 'UNSUPPORTED_OPTION'
+  | 'NO_ITEM'
+  | 'NOT_EQUIPPED'
+  | 'MAJOR_MISMATCH'
+  | 'CHOICE_REQUIRED';
 
 export type DomainEvent =
   | {
@@ -172,7 +219,14 @@ export type DomainEvent =
       amount?: number;
     }
   | { type: 'BASE_HP_CHANGED'; tick: number; from: number; to: number }
-  | { type: 'WAVE_STARTED' | 'WAVE_CLEARED' | 'GAME_WON' | 'GAME_LOST'; tick: number; wave: number };
+  | { type: 'WAVE_STARTED' | 'WAVE_CLEARED' | 'GAME_WON' | 'GAME_LOST'; tick: number; wave: number }
+  | {
+      type: 'EQUIPMENT_CRAFTED' | 'EQUIPMENT_EQUIPPED' | 'EQUIPMENT_UNEQUIPPED' | 'EQUIPMENT_RETURNED';
+      tick: number;
+      itemId: string;
+      /** Unit the item was put on / taken from (RETURNED: the merge material). */
+      unitId?: string;
+    };
 
 export type CommandResult = {
   accepted: boolean;
@@ -180,7 +234,10 @@ export type CommandResult = {
   events: DomainEvent[];
 };
 
+/** range / damage / attackTicks are effective values (growth modifiers applied; may be fractional). */
 export type UnitView = Unit & { range: number; damage: number; attackTicks: number };
+
+export type GrowthView = { blueprints: string[]; inventory: EquipmentItem[] };
 
 export type EnemyView = {
   id: string;
@@ -214,4 +271,5 @@ export type RenderSnapshot = {
   selectedUnitId: string | null;
   units: UnitView[];
   enemies: EnemyView[];
+  growth?: GrowthView;
 };

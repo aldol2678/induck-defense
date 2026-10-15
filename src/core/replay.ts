@@ -1,6 +1,6 @@
 // Contract R0.1 §6: replay log = seed + timestamped commands + map hash + ruleset version.
 import { applyCommand, createSession, logicalState, stepWithEvents } from './engine';
-import type { CommandResult, DomainEvent, GameState, MapDefinition, PlayerCommand, Ruleset } from './types';
+import type { CommandResult, DomainEvent, GameState, GrowthConfig, MapDefinition, PlayerCommand, Ruleset } from './types';
 
 export type ReplayEntry = { tick: number; command: PlayerCommand };
 
@@ -13,6 +13,8 @@ export type ReplayLog = {
   /** Commands are applied before the tick with number `tick + 1` is simulated. */
   entries: ReplayEntry[];
   totalTicks: number;
+  /** R1-B growth snapshot (owned blueprints). Absent for plain R0 replays. */
+  growth?: GrowthConfig;
 };
 
 export type ReplayResult = {
@@ -22,7 +24,7 @@ export type ReplayResult = {
 };
 
 export function runReplay(map: MapDefinition, log: ReplayLog, rules?: Ruleset): ReplayResult {
-  const state = createSession({ map, seed: log.seed, ruleset: log.ruleset, rules });
+  const state = createSession({ map, seed: log.seed, ruleset: log.ruleset, rules, growth: log.growth });
   // Stable sort by tick keeps the input-queue order of commands sharing a tick.
   const entries = log.entries.map((e, i) => ({ ...e, i })).sort((a, b) => a.tick - b.tick || a.i - b.i);
   const events: DomainEvent[] = [];

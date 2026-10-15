@@ -3,6 +3,7 @@
 import Phaser from 'phaser';
 import type { GameController } from '../core/controller';
 import type { DomainEvent, Major, MapDefinition, Point, RejectReason, RenderSnapshot, UnitView } from '../core/types';
+import { getEquipment, getTrait, TRAIT_TIER_LABEL } from '../core/growth';
 import { ENEMY_STYLE, generateTextures, MAJOR_STYLE, TEX } from './art';
 
 export type SceneHooks = {
@@ -11,14 +12,30 @@ export type SceneHooks = {
   onFrame(snapshot: RenderSnapshot): void;
   onReject(reason: RejectReason): void;
   onHint(text: string): void;
+  /** Growth sessions: a merge needs the player to pick the inherited trait (core rejected it untouched). */
+  onMergeChoice?(unitId: string, to: Point): void;
 };
+
+const TIER_COLOR = { normal: '#ffffff', rare: '#5fb4ff', epic: '#c78bff', legend: '#ffd34d' } as const;
+
+const fmt = (n: number) => String(Math.round(n * 100) / 100);
+
+/** Growth marker: equipped item emoji + ◆ coloured by innate-trait tier (rare and above). */
+function growthMark(u: UnitView): { text: string; color: string } {
+  const tier = getTrait(u.trait)?.tier;
+  const gear = getEquipment(u.equipment?.blueprintId)?.emoji ?? '';
+  const glyph = tier && tier !== 'normal' ? '◆' : '';
+  return { text: gear + glyph, color: tier ? TIER_COLOR[tier] : '#ffffff' };
+}
 
 type UnitSprite = {
   root: Phaser.GameObjects.Container;
   duck: Phaser.GameObjects.Image;
   star: Phaser.GameObjects.Text;
+  mark: Phaser.GameObjects.Text;
   key: string;
   cellKey: string;
+  markKey: string;
 };
 
 type EnemySprite = {
@@ -271,7 +288,7 @@ export class BattleScene extends Phaser.Scene {
     this.hooks.onFrame(this.snap);
   }
 
-  private makeUnitContainer(u: Pick<UnitView, 'major' | 'star'>): Omit<UnitSprite, 'key' | 'cellKey'> {
+  private makeUnitContainer(u: Pick<UnitView, 'major' | 'star'>): Omit<UnitSprite, 'key' | 'cellKey' | 'markKey'> {
     const t = this.tile;
     const duck = this.add.image(0, 0, `duck-${u.major}`).setScale((t * 0.94) / TEX);
     const star = this.add
@@ -294,8 +311,17 @@ export class BattleScene extends Phaser.Scene {
         padding: { x: Math.round(t * 0.04), y: 0 },
       })
       .setOrigin(0, 1);
-    const root = this.add.container(0, 0, [duck, star, badge]);
-    return { root, duck, star };
+    const mark = this.add
+      .text(-t * 0.46, -t * 0.46, '', {
+        fontFamily: 'system-ui, sans-serif',
+        fontStyle: '900',
+        fontSize: `${Math.round(t * 0.2)}px`,
+        stroke: '#20344f',
+        strokeThickness: Math.max(1, Math.round(t * 0.03)),
+      })
+      .setOrigin(0, 0);
+    const root = this.add.container(0, 0, [duck, star, badge, mark]);
+    return { root, duck, star, mark };
   }
 
   private syncUnits(): void {
@@ -309,7 +335,7 @@ export class BattleScene extends Phaser.Scene {
       let s = this.units.get(u.id);
       if (!s) {
         const parts = this.makeUnitContainer(u);
-        s = { ...parts, key, cellKey };
+        s = { ...parts, key, cellKey, markKey: '' };
         s.root.setPosition(pos.x, pos.y);
         this.unitLayer.add(s.root);
         this.units.set(u.id, s);
@@ -322,6 +348,12 @@ export class BattleScene extends Phaser.Scene {
         s.key = key;
         s.root.setScale(1.35);
         this.tweens.add({ targets: s.root, scale: 1, duration: 280, ease: 'Back.Out' });
+      }
+      const mark = growthMark(u);
+      const markKey = mark.text + mark.color;
+      if (s.markKey !== markKey) {
+        s.markKey = markKey;
+        s.mark.setText(mark.text).setColor(mark.color);
       }
       if (s.cellKey !== cellKey) {
         s.cellKey = cellKey;
@@ -557,7 +589,8 @@ export class BattleScene extends Phaser.Scene {
         this.finishGhost(cell, true);
       } else {
         const r = c.dispatch({ type: 'DROP_UNIT', unitId: g.unitId, to: cell });
-        if (!r.accepted && r.reason) this.hooks.onReject(r.reason);
+        if (r.reason === 'CHOICE_REQUIRED' && this.hooks.onMergeChoice) this.hooks.onMergeChoice(g.unitId, cell);
+        else if (!r.accepted && r.reason) this.hooks.onReject(r.reason);
         this.finishGhost(r.accepted ? cell : (from?.cell ?? g.cell), r.accepted);
       }
     } else {
@@ -577,15 +610,18 @@ export class BattleScene extends Phaser.Scene {
       }
       const r = c.dispatch({ type: 'DROP_UNIT', unitId: selected, to: cell });
       if (!r.accepted) {
-        if (r.reason) this.hooks.onReject(r.reason);
         c.dispatch({ type: 'CANCEL_SELECTION' });
+        if (r.reason === 'CHOICE_REQUIRED' && this.hooks.onMergeChoice) this.hooks.onMergeChoice(selected, cell);
+        else if (r.reason) this.hooks.onReject(r.reason);
       }
       return;
     }
     if (here) {
       c.dispatch({ type: 'SELECT_UNIT', unitId: here.id });
-      const rule = here;
-      this.hooks.onHint(`${MAJOR_LABEL[here.major]} ★${here.star} · 사거리 ${rule.range}칸 · 공격 ${rule.damage} · 옮길 칸 탭`);
+      const trait = getTrait(here.trait);
+      const gear = getEquipment(here.equipment?.blueprintId);
+      const extra = (trait ? ` · ${trait.label}(${TRAIT_TIER_LABEL[trait.tier]})` : '') + (gear ? ` · ${gear.emoji}` : '');
+      this.hooks.onHint(`${MAJOR_LABEL[here.major]} ★${here.star}${extra} · 사거리 ${fmt(here.range)}칸 · 공격 ${fmt(here.damage)} · 옮길 칸 탭`);
     } else if (this.tileAt(cell) === '.') {
       this.hooks.onHint('빈 칸 — 소환하면 빈 칸 중 한 곳에 나타나요');
     } else if (this.tileAt(cell)) {

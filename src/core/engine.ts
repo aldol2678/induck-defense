@@ -1,6 +1,19 @@
 // INDUCK-R0-001 R0.1 headless battle engine.
 // Fixed 50 ms ticks, seeded mulberry32, atomic commands. See docs/implementation-plan.md.
 import r0Rules from '../../fixtures/r0/ruleset.json' with { type: 'json' };
+import {
+  addMods,
+  canEquip,
+  cooldownWithCarry,
+  CRAFT_COST,
+  damageWithCarry,
+  getEquipment,
+  getTrait,
+  NO_MODS,
+  normalizeBlueprints,
+  rollTrait,
+  traitStreamSeed,
+} from './growth';
 import { buildableCells, inBounds, isBuildable, MapValidationError, validateMapDefinition } from './mapValidation';
 import { isValidSeed, nextRandom } from './rng';
 import type {
@@ -9,6 +22,7 @@ import type {
   Enemy,
   EnemyView,
   GameState,
+  GrowthConfig,
   Major,
   MapDefinition,
   PlayerCommand,
@@ -16,6 +30,7 @@ import type {
   RejectReason,
   RenderSnapshot,
   Ruleset,
+  StatMods,
   Star,
   Unit,
   UnitView,
@@ -23,7 +38,14 @@ import type {
 
 export const R0_RULES = r0Rules as Ruleset;
 
-export type SessionConfig = { map: MapDefinition; seed: number; ruleset: 'R0'; rules?: Ruleset };
+export type SessionConfig = {
+  map: MapDefinition;
+  seed: number;
+  ruleset: 'R0';
+  rules?: Ruleset;
+  /** Opt-in R1-B growth layer (equipment, innate traits). Omit for a plain R0 session. */
+  growth?: GrowthConfig;
+};
 
 export function msToTicks(rules: Ruleset, ms: number): number {
   return Math.max(1, Math.round(ms / rules.tickMs));
@@ -40,7 +62,7 @@ export function createSession(config: SessionConfig): GameState {
   const validation = validateMapDefinition(config.map);
   if (!validation.ok) throw new MapValidationError(validation);
   const rules = config.rules ?? R0_RULES;
-  return {
+  const state: GameState = {
     tick: 0,
     phase: 'ready',
     paused: false,
@@ -64,6 +86,30 @@ export function createSession(config: SessionConfig): GameState {
     map: config.map,
     rules,
   };
+  if (config.growth) {
+    const owned = Array.isArray(config.growth.blueprints) ? config.growth.blueprints : [];
+    state.growth = {
+      blueprints: normalizeBlueprints(owned),
+      traitRngState: traitStreamSeed(config.seed),
+      nextItemId: 1,
+      inventory: [],
+    };
+  }
+  return state;
+}
+
+/** Sum of a unit's innate trait and equipped-item modifiers (zero outside growth sessions). */
+export function unitMods(state: GameState, unit: Unit): StatMods {
+  if (!state.growth) return NO_MODS;
+  let mods = getTrait(unit.trait)?.mods ?? NO_MODS;
+  const gear = getEquipment(unit.equipment?.blueprintId);
+  if (gear?.mods) mods = addMods(mods, gear.mods);
+  return mods;
+}
+
+/** Effective range (tiles) used for targeting. */
+export function unitRange(state: GameState, unit: Unit): number {
+  return state.rules.majors[unit.major].range + unitMods(state, unit).rangeCenti / 100;
 }
 
 function random(state: GameState): number {
@@ -105,7 +151,8 @@ export function applyCommand(state: GameState, command: PlayerCommand): CommandR
   switch (command.type) {
     case 'RESTART': {
       if (!isValidSeed(command.seed)) return reject('INVALID_STATE');
-      Object.assign(state, createSession({ map: state.map, seed: command.seed, ruleset: 'R0', rules: state.rules }));
+      const growth = state.growth ? { blueprints: state.growth.blueprints } : undefined;
+      Object.assign(state, createSession({ map: state.map, seed: command.seed, ruleset: 'R0', rules: state.rules, growth }));
       return ok();
     }
     case 'PAUSE':
@@ -152,6 +199,15 @@ export function applyCommand(state: GameState, command: PlayerCommand): CommandR
       const major = majors[Math.floor(random(state) * majors.length)]!;
       const cell = empty[Math.floor(random(state) * empty.length)]!;
       const unit: Unit = { id: `u${state.nextEntityId++}`, major, star: 1, cell: { ...cell }, cooldownTicks: 0 };
+      if (state.growth) {
+        // Separate stream: the gameplay RNG above is consumed exactly as in R0.
+        const t = rollTrait(state.growth.traitRngState);
+        state.growth.traitRngState = t.state;
+        unit.trait = t.traitId;
+        unit.equipment = null;
+        unit.damageCarry = 0;
+        unit.cooldownCarry = 0;
+      }
       state.units.push(unit);
       state.coin -= state.rules.summonCost;
       events.push({ type: 'UNIT_SUMMONED', tick: state.tick, unitId: unit.id });
@@ -186,11 +242,27 @@ export function applyCommand(state: GameState, command: PlayerCommand): CommandR
         events.push({ type: 'UNIT_MOVED', tick: state.tick, unitId: unit.id });
       } else if (other.major === unit.major && other.star === unit.star) {
         if (other.star >= state.rules.maxStar) return reject('MAX_STAR');
+        const growth = state.growth;
+        let keptTrait = other.trait;
+        if (growth && unit.trait !== other.trait) {
+          // Rejected (state untouched) until the player picks which trait the result keeps.
+          if (command.inherit !== 'target' && command.inherit !== 'source') return reject('CHOICE_REQUIRED');
+          if (command.inherit === 'source') keptTrait = unit.trait;
+        }
         // The target (to) unit survives with its id; the dragged unit is consumed.
         other.star = (other.star + 1) as Star;
         other.cooldownTicks = 0;
         state.units = state.units.filter((u) => u.id !== unit.id);
         events.push({ type: 'UNIT_MERGED', tick: state.tick, unitId: other.id, otherUnitId: unit.id });
+        if (growth) {
+          other.trait = keptTrait;
+          other.cooldownCarry = 0;
+          // The result keeps its own item; the material's item goes back to the run inventory.
+          if (unit.equipment) {
+            growth.inventory.push(unit.equipment);
+            events.push({ type: 'EQUIPMENT_RETURNED', tick: state.tick, itemId: unit.equipment.id, unitId: unit.id });
+          }
+        }
       } else {
         const from = unit.cell;
         unit.cell = other.cell;
@@ -198,6 +270,58 @@ export function applyCommand(state: GameState, command: PlayerCommand): CommandR
         events.push({ type: 'UNIT_SWAPPED', tick: state.tick, unitId: unit.id, otherUnitId: other.id });
       }
       state.selectedUnitId = null;
+      return ok();
+    }
+
+    case 'CRAFT_EQUIPMENT': {
+      const growth = state.growth;
+      if (!growth) return reject('GROWTH_DISABLED');
+      if (!ACTIVE_PHASES.has(state.phase)) return reject('PHASE_BLOCKED');
+      if (typeof command.blueprintId !== 'string' || !growth.blueprints.includes(command.blueprintId)) return reject('NOT_OWNED');
+      const def = getEquipment(command.blueprintId);
+      if (!def?.mods) return reject('UNSUPPORTED_OPTION');
+      const cost = CRAFT_COST[def.rarity];
+      if (state.coin < cost) return reject('NO_FUNDS');
+      const item = { id: `g${growth.nextItemId++}`, blueprintId: def.id };
+      growth.inventory.push(item);
+      state.coin -= cost;
+      events.push({ type: 'EQUIPMENT_CRAFTED', tick: state.tick, itemId: item.id });
+      return ok();
+    }
+
+    case 'EQUIP': {
+      const growth = state.growth;
+      if (!growth) return reject('GROWTH_DISABLED');
+      if (!ACTIVE_PHASES.has(state.phase)) return reject('PHASE_BLOCKED');
+      const unit = state.units.find((u) => u.id === command.unitId);
+      if (!unit) return reject('NO_UNIT');
+      const index = growth.inventory.findIndex((i) => i.id === command.itemId);
+      if (index < 0) return reject('NO_ITEM');
+      const item = growth.inventory[index]!;
+      const def = getEquipment(item.blueprintId);
+      if (!def?.mods) return reject('UNSUPPORTED_OPTION');
+      if (!canEquip(def, unit.major)) return reject('MAJOR_MISMATCH');
+      growth.inventory.splice(index, 1);
+      if (unit.equipment) {
+        growth.inventory.push(unit.equipment);
+        events.push({ type: 'EQUIPMENT_UNEQUIPPED', tick: state.tick, itemId: unit.equipment.id, unitId: unit.id });
+      }
+      unit.equipment = item;
+      events.push({ type: 'EQUIPMENT_EQUIPPED', tick: state.tick, itemId: item.id, unitId: unit.id });
+      return ok();
+    }
+
+    case 'UNEQUIP': {
+      const growth = state.growth;
+      if (!growth) return reject('GROWTH_DISABLED');
+      if (!ACTIVE_PHASES.has(state.phase)) return reject('PHASE_BLOCKED');
+      const unit = state.units.find((u) => u.id === command.unitId);
+      if (!unit) return reject('NO_UNIT');
+      if (!unit.equipment) return reject('NOT_EQUIPPED');
+      const item = unit.equipment;
+      growth.inventory.push(item);
+      unit.equipment = null;
+      events.push({ type: 'EQUIPMENT_UNEQUIPPED', tick: state.tick, itemId: item.id, unitId: unit.id });
       return ok();
     }
   }
@@ -308,15 +432,28 @@ function stepOnce(state: GameState, events: DomainEvent[]): void {
     if (unit.cooldownTicks > 0) unit.cooldownTicks -= 1;
     if (unit.cooldownTicks > 0) continue;
     const rule = rules.majors[unit.major];
-    const target = selectTarget(state, unit, rule.range);
+    const mods = unitMods(state, unit);
+    const target = selectTarget(state, unit, rule.range + mods.rangeCenti / 100);
     if (!target) continue;
     let damage = unitDamage(rules, unit.major, unit.star);
+    if (state.growth) {
+      // Fixed-point bonus damage: a +8% on a 3-damage unit is not rounded away.
+      const d = damageWithCarry(damage, mods.damagePct, unit.damageCarry ?? 0);
+      damage = d.damage;
+      unit.damageCarry = d.carry;
+    }
     if (target.exposedTicks > 0) {
       const mult = rules.majors.humanities.effect?.damageTakenMultiplier ?? 1;
       damage = Math.round(damage * mult);
     }
     target.hp -= damage;
-    unit.cooldownTicks = msToTicks(rules, rule.attackMs);
+    if (state.growth) {
+      const cd = cooldownWithCarry(rule.attackMs, rules.tickMs, mods.attackSpeedPct, unit.cooldownCarry ?? 0);
+      unit.cooldownTicks = cd.ticks;
+      unit.cooldownCarry = cd.carry;
+    } else {
+      unit.cooldownTicks = msToTicks(rules, rule.attackMs);
+    }
     events.push({ type: 'ENEMY_DAMAGED', tick: state.tick, enemyId: target.id, unitId: unit.id, amount: damage });
     if (rule.effect?.type === 'expose') target.exposedTicks = msToTicks(rules, rule.effect.durationMs);
     if (target.hp <= 0) {
@@ -376,13 +513,23 @@ export function step(state: GameState, fixedTicks: number): GameState {
 
 export function getSnapshot(state: GameState): RenderSnapshot {
   const rules = state.rules;
-  const units: UnitView[] = state.units.map((u) => ({
-    ...u,
-    cell: { ...u.cell },
-    range: rules.majors[u.major].range,
-    damage: unitDamage(rules, u.major, u.star),
-    attackTicks: msToTicks(rules, rules.majors[u.major].attackMs),
-  }));
+  const units: UnitView[] = state.units.map((u) => {
+    const view: UnitView = {
+      ...u,
+      cell: { ...u.cell },
+      range: rules.majors[u.major].range,
+      damage: unitDamage(rules, u.major, u.star),
+      attackTicks: msToTicks(rules, rules.majors[u.major].attackMs),
+    };
+    if (state.growth) {
+      const mods = unitMods(state, u);
+      if (u.equipment) view.equipment = { ...u.equipment };
+      view.range = unitRange(state, u);
+      view.damage = (view.damage * (100 + mods.damagePct)) / 100;
+      view.attackTicks = (rules.majors[u.major].attackMs * 100) / (100 + mods.attackSpeedPct) / rules.tickMs;
+    }
+    return view;
+  });
   const enemies: EnemyView[] = state.enemies.map((e) => {
     const pos = enemyWorldPosition(state.map, e);
     return {
@@ -421,6 +568,9 @@ export function getSnapshot(state: GameState): RenderSnapshot {
     selectedUnitId: state.selectedUnitId,
     units,
     enemies,
+    ...(state.growth
+      ? { growth: { blueprints: [...state.growth.blueprints], inventory: state.growth.inventory.map((i) => ({ ...i })) } }
+      : {}),
   };
 }
 
