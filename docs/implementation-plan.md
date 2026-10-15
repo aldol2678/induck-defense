@@ -43,7 +43,7 @@ e2e/mobile.spec.ts                Chromium 모바일 뷰포트·포인터 E2E (P
 
 | 계약 §3.3 | 구현 |
 |---|---|
-| `validateMap(catalog, mapId)` | `src/core/mapValidation.ts` — 계약 코드 10종 + 카탈로그에 없는 id용 `MAP_NOT_FOUND` |
+| `validateMap(catalog, mapId)` | `src/core/mapValidation.ts` — 계약 코드 10종 + `MAP_NOT_FOUND`(카탈로그에 없는 id), `PATH_DUPLICATE`(다른 경로와 완전히 동일), `PATH_REVISIT`(한 경로 안에서 이미 지난 칸 재방문) — 후자 2종은 STABILIZE-001 D1·D2 |
 | `createSession({map, seed, ruleset:'R0'})` | `engine.ts` — 잘못된 맵이면 `MapValidationError` throw(게임 시작 실패), 잘못된 seed는 Error |
 | `applyCommand(state, cmd): CommandResult` | `engine.ts` — 거부 시 상태·코인·쿨다운·RNG 불변(테스트로 deep-equal 확인) |
 | `step(state, fixedTicks)` | `engine.ts` — 1 tick = 50 ms. 이벤트가 필요하면 `stepWithEvents` |
@@ -82,6 +82,7 @@ e2e/mobile.spec.ts                Chromium 모바일 뷰포트·포인터 E2E (P
 | P5 | 이벤트 선택 필드 | `ENEMY_DAMAGED/KILLED`에 `unitId, amount`, 합성/교환에 `otherUnitId` | 연출용, 판정 영향 없음 |
 | P6 | `ready` 단계 tick 정지 | START_RUN 전에는 tick 미진행 | replay 해석 명확화 |
 | P7 | `GOAL_MISMATCH` 정의 | 그리드의 B가 정확히 1개가 아니거나, 경로 끝점이 그 B와 다르면 발생 | 검증 규칙 해석 |
+| P8 | 단순 경로 정책 (D1·D2) | 동일 경로 중복 등록 `PATH_DUPLICATE`, 경로 내 칸 재방문 `PATH_REVISIT`. 서로 다른 출현점 경로의 부분 합류는 허용 | 신규 오류 코드 2종 |
 
 밸런스 근거(시드 1..60, 헤드리스 봇): 길 옆 배치+합성 봇 59/60 승, 무작위 배치 봇 11/60 승, 유닛 없음 = 2웨이브 패배.
 

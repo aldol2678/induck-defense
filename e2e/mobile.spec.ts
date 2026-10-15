@@ -92,6 +92,18 @@ for (const vp of VIEWPORTS) {
         expect(c.x).toBeLessThan(cv.x + cv.width);
         expect(c.y).toBeLessThan(cv.y + cv.height);
       }
+      // STABILIZE-001 P2: secondary text ≥ 10 CSS px and never clipped
+      const text = await page.evaluate(() =>
+        ['.logo small', '#waveInfo', '#note', '.major-chip', '.major-chip small', '.pill', '.action'].map((sel) => {
+          const els = [...document.querySelectorAll<HTMLElement>(sel)];
+          return { sel, min: Math.min(...els.map((e) => parseFloat(getComputedStyle(e).fontSize))), clipped: els.some((e) => e.scrollWidth > e.clientWidth + 0.5) };
+        }),
+      );
+      for (const t of text) {
+        expect(t.min, t.sel).toBeGreaterThanOrEqual(10);
+        expect(t.clipped, t.sel).toBe(false);
+      }
+      expect(await page.evaluate(() => getComputedStyle(document.getElementById('modal')!).wordBreak)).toBe('keep-all');
       const tile = (await cell(page, { x: 1, y: 0 })).x - corners[0]!.x;
       expect(tile).toBeGreaterThanOrEqual(36); // touch target ≥ 36 CSS px per cell
       await page.screenshot({ path: `${SHOTS}/${vp.width}x${vp.height}-battle.png` });

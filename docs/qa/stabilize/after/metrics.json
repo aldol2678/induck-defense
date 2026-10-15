@@ -1,0 +1,65 @@
+{
+ "320x568": {
+  "scroll": [
+   568,
+   568
+  ],
+  "font": {
+   "logoSmall": 10,
+   "waveInfo": 11,
+   "note": 11,
+   "chip": 11,
+   "chipSmall": 10,
+   "pill": 11,
+   "action": 13
+  },
+  "clipped": {
+   "note": false,
+   "chips": false,
+   "waveInfo": false
+  },
+  "noteText": "같은 전공·★끼리 겹치면 합성 · ▶ 전투 시작"
+ },
+ "360x640": {
+  "scroll": [
+   640,
+   640
+  ],
+  "font": {
+   "logoSmall": 10.8,
+   "waveInfo": 12.24,
+   "note": 12.24,
+   "chip": 12.24,
+   "chipSmall": 10,
+   "pill": 12.24,
+   "action": 14.04
+  },
+  "clipped": {
+   "note": false,
+   "chips": false,
+   "waveInfo": false
+  },
+  "noteText": "같은 전공·★끼리 겹치면 합성 · ▶ 전투 시작"
+ },
+ "390x844": {
+  "scroll": [
+   844,
+   844
+  ],
+  "font": {
+   "logoSmall": 11,
+   "waveInfo": 13,
+   "note": 13,
+   "chip": 13,
+   "chipSmall": 10,
+   "pill": 13.26,
+   "action": 15
+  },
+  "clipped": {
+   "note": false,
+   "chips": false,
+   "waveInfo": false
+  },
+  "noteText": "같은 전공·★끼리 겹치면 합성 · ▶ 전투 시작"
+ }
+}

@@ -90,9 +90,9 @@ export class Hud {
     waveBtn.disabled = s.paused || s.phase !== 'intermission';
     $('waveBtnText').textContent = s.phase === 'wave' ? '진행 중' : s.wave === 0 ? '전투 시작' : `WAVE ${s.wave + 1}`;
     $<HTMLButtonElement>('pauseBtn').disabled = !(s.phase === 'wave' || s.phase === 'intermission');
-    if (s.phase === 'intermission' && s.units.length === 0) this.hint('🪙 소환하기로 인덕이를 부르고, 길 옆으로 끌어다 놓으세요');
-    else if (s.phase === 'intermission' && s.wave === 0) this.hint('같은 전공·같은 ★끼리 겹치면 합성 · 준비되면 ▶ 전투 시작');
-    else if (s.phase === 'wave') this.hint('끌어서 이동 · 같은 전공·★ 위에 놓으면 합성 · 다른 인덕이와 교환');
+    if (s.phase === 'intermission' && s.units.length === 0) this.hint('🪙 소환한 인덕이를 길 옆으로 옮기세요');
+    else if (s.phase === 'intermission' && s.wave === 0) this.hint('같은 전공·★끼리 겹치면 합성 · ▶ 전투 시작');
+    else if (s.phase === 'wave') this.hint('끌어서 이동 · 같은 전공·★ 합성 · 교환');
   }
 
   hint(text: string): void {

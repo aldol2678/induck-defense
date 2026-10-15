@@ -73,6 +73,8 @@ export class BattleScene extends Phaser.Scene {
   private boardGfx!: Phaser.GameObjects.Graphics;
   private highlightGfx!: Phaser.GameObjects.Graphics;
   private rangeGfx!: Phaser.GameObjects.Graphics;
+  /** Clips range previews to the 7×7 board so they never spill onto the background. */
+  private rangeMaskGfx!: Phaser.GameObjects.Graphics;
   private unitLayer!: Phaser.GameObjects.Container;
   private enemyLayer!: Phaser.GameObjects.Container;
   private fxLayer!: Phaser.GameObjects.Container;
@@ -99,6 +101,8 @@ export class BattleScene extends Phaser.Scene {
     this.boardGfx = this.add.graphics();
     this.highlightGfx = this.add.graphics();
     this.rangeGfx = this.add.graphics();
+    this.rangeMaskGfx = this.make.graphics({ x: 0, y: 0 }, false);
+    this.rangeGfx.setMask(this.rangeMaskGfx.createGeometryMask());
     this.enemyLayer = this.add.container();
     this.unitLayer = this.add.container();
     this.fxLayer = this.add.container();
@@ -129,6 +133,7 @@ export class BattleScene extends Phaser.Scene {
     const slackY = Math.max(0, height - this.tile * map.height - pad * 2);
     const headroom = Math.min(slackY, this.tile * 0.9);
     this.oy = Math.round(pad + headroom + (slackY - headroom) / 2);
+    this.rangeMaskGfx.clear().fillStyle(0xffffff).fillRect(this.ox, this.oy, this.tile * map.width, this.tile * map.height);
     this.drawBoard();
     for (const s of this.units.values()) s.root.destroy();
     this.units.clear();
@@ -445,6 +450,8 @@ export class BattleScene extends Phaser.Scene {
       const col = Phaser.Display.Color.HexStringToColor(MAJOR_STYLE[rangeUnit.major].css).color;
       rg.fillStyle(col, 0.14).fillCircle(c.x, c.y, rangeUnit.range * t);
       rg.lineStyle(2 * this.dpr, col, 0.9).strokeCircle(c.x, c.y, rangeUnit.range * t);
+      // board edge = where the (clipped) range ends
+      hg.lineStyle(2 * this.dpr, 0x2f5f86, 0.75).strokeRect(this.ox, this.oy, t * map.width, t * map.height);
     }
   }
 
@@ -578,11 +585,11 @@ export class BattleScene extends Phaser.Scene {
     if (here) {
       c.dispatch({ type: 'SELECT_UNIT', unitId: here.id });
       const rule = here;
-      this.hooks.onHint(`${MAJOR_LABEL[here.major]} ★${here.star} · 사거리 ${rule.range}칸 · 공격력 ${rule.damage} — 옮길 칸을 탭하세요`);
+      this.hooks.onHint(`${MAJOR_LABEL[here.major]} ★${here.star} · 사거리 ${rule.range}칸 · 공격 ${rule.damage} · 옮길 칸 탭`);
     } else if (this.tileAt(cell) === '.') {
-      this.hooks.onHint('빈 칸이에요 — 소환하면 빈 칸 중 한 곳에 인덕이가 나타나요');
+      this.hooks.onHint('빈 칸 — 소환하면 빈 칸 중 한 곳에 나타나요');
     } else if (this.tileAt(cell)) {
-      this.hooks.onHint('길·출현지·본부에는 인덕이를 둘 수 없어요');
+      this.hooks.onHint('길·출현지·본부에는 둘 수 없어요');
     }
   }
 

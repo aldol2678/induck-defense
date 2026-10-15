@@ -1,0 +1,13 @@
+
+> induck-defense@0.1.0-r0 build
+> tsc --noEmit && vite build
+
+vite v7.3.7 building client environment for production...
+transforming...
+✓ 18 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     2.27 kB │ gzip:   0.97 kB
+dist/assets/index-BMx3X__1.css      7.18 kB │ gzip:   2.52 kB
+dist/assets/index-CTIH1Xwh.js   1,253.22 kB │ gzip: 348.57 kB
+✓ built in 7.26s

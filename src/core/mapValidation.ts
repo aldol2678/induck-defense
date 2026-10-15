@@ -80,6 +80,21 @@ export function validateMapDefinition(map: MapDefinition): ValidationResult {
         }
       }
     });
+    // R0 simple-path policy: a path may not step back onto a cell it already visited (A→B→A).
+    const seen = new Set<string>();
+    for (const p of path) {
+      const key = `${p.x},${p.y}`;
+      if (seen.has(key)) {
+        errors.push({ code: 'PATH_REVISIT', mapId, pathIndex, at: { x: p.x, y: p.y } });
+        break;
+      }
+      seen.add(key);
+    }
+    // An exact copy of an earlier path is rejected; distinct spawns merging into a shared road stay valid.
+    const sig = JSON.stringify(path.map((p) => [p.x, p.y]));
+    if (paths.slice(0, pathIndex).some((q) => Array.isArray(q) && JSON.stringify(q.map((p) => [p.x, p.y])) === sig)) {
+      errors.push({ code: 'PATH_DUPLICATE', mapId, pathIndex });
+    }
     const first = path[0]!;
     const last = path[path.length - 1]!;
     if (!inBounds(map, first) || tileAt(map, first) !== 'S') errors.push({ code: 'START_NOT_S', mapId, pathIndex, at: first });

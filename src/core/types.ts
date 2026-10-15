@@ -25,6 +25,8 @@ export type ValidationErrorCode =
   | 'PATH_OOB'
   | 'PATH_INVALID_TILE'
   | 'PATH_NON_ADJACENT'
+  | 'PATH_DUPLICATE'
+  | 'PATH_REVISIT'
   | 'START_NOT_S'
   | 'END_NOT_B'
   | 'SPAWN_UNCOVERED'

@@ -1,0 +1,4 @@
+
+> induck-defense@0.1.0-r0 typecheck
+> tsc --noEmit
+
